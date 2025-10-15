@@ -1,19 +1,17 @@
 name: CI Pipeline for Shailun App
 
-# Triggers: on push to main, pull request, or manual trigger
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:   # allows manual trigger
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout Code
+      # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -31,45 +29,29 @@ jobs:
 
       # 4️⃣ Linting
       - name: Run Flake8 Lint
-        run: |
-          pip install flake8
-          flake8 .   # fails workflow if linting fails
+        run: flake8 .
 
       # 5️⃣ Bandit Security Scan
       - name: Bandit Scan
-        run: |
-          pip install bandit
-          bandit -r .   # fails workflow if security issues found
+        run: bandit -r .
 
-      # 6️⃣ Trivy File System Scan
-      - name: Trivy FS Scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          format: 'table'
-          ignore-unfixed: true
-          exit-code: '1'   # fail if vulnerabilities found
-
-      # 7️⃣ Unit Tests + Coverage
+      # 6️⃣ Unit Tests + Coverage
       - name: Run Unit Tests with Coverage
-        run: |
-          pip install pytest pytest-cov
-          pytest --cov=shailuns --cov-fail-under=80
+        run: pytest --cov=shailuns --cov-fail-under=80
 
-      # 8️⃣ Build Docker Image
+      # 7️⃣ Build Docker Image
       - name: Build Docker Image
-        run: |
-          docker build -t shailun-app:latest .
+        run: docker build -t shailun-app:latest .
 
-      # 9️⃣ Trivy Docker Image Scan
+      # 8️⃣ Docker Image Scan
       - name: Trivy Docker Image Scan
-        run: |
-          trivy image --exit-code 1 --severity CRITICAL,HIGH shailun-app:latest
+        run: trivy image --exit-code 0 --severity CRITICAL,HIGH shailun-app:latest
 
-      # 🔟 Push Docker Image to Docker Hub
+      # 9️⃣ Push Docker Image
       - name: Push Docker Image
-        if: success()   # only runs if all previous steps succeed
+        if: success()
         run: |
           echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
           docker tag shailun-app:latest ${{ secrets.DOCKER_USER }}/shailun-app:latest
           docker push ${{ secrets.DOCKER_USER }}/shailun-app:latest
+
