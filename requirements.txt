@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+flake8
+bandit
+pytest
+git init
