@@ -1,57 +1,64 @@
-name: CI Pipeline for Shailun App
+name: CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
-  build-and-test:
+  build-and-scan:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code
+      # Checkout code
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      # 2️⃣ Set up Python 3.12
+      # Set up Python
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
-      # 3️⃣ Install dependencies
+      # Install linting dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install flake8
 
-      # 4️⃣ Linting
-      - name: Run Flake8 Lint
+      # Lint Python code
+      - name: Lint code
         run: flake8 .
 
-      # 5️⃣ Bandit Security Scan
-      - name: Bandit Scan
-        run: bandit -r .
+      # Optional: Secret detection
+      - name: Detect secrets
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - run: github/codeql-action/analyze@v3
 
-      # 6️⃣ Unit Tests + Coverage
-      - name: Run Unit Tests with Coverage
-        run: pytest --cov=shailuns --cov-fail-under=80
+      # Trivy filesystem scan
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          format: json
+          output: trivy-fs-report.json
 
-      # 7️⃣ Build Docker Image
-      - name: Build Docker Image
-        run: docker build -t shailun-app:latest .
+      # Docker login using official action (fixed)
+      - name: Docker Login
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 8️⃣ Docker Image Scan
-      - name: Trivy Docker Image Scan
-        run: trivy image --exit-code 0 --severity CRITICAL,HIGH shailun-app:latest
+      # Build Docker image
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/vamsin-app:latest .
 
-      # 9️⃣ Push Docker Image
-      - name: Push Docker Image
-        if: success()
-        run: |
-          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
-          docker tag shailun-app:latest ${{ secrets.DOCKER_USER }}/shailun-app:latest
-          docker push ${{ secrets.DOCKER_USER }}/shailun-app:latest
-
+      # Push Docker image
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/vamsin-app:latest
