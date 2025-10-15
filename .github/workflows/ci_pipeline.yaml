@@ -1,10 +1,12 @@
 name: CI Pipeline for Shailun App
 
+# Triggers: on push to main, pull request, or manual trigger
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:   # allows manual trigger
 
 jobs:
   build-and-test:
@@ -31,13 +33,13 @@ jobs:
       - name: Run Flake8 Lint
         run: |
           pip install flake8
-          flake8 . || true   # ignore errors for now
+          flake8 .   # fails workflow if linting fails
 
       # 5️⃣ Bandit Security Scan
       - name: Bandit Scan
         run: |
           pip install bandit
-          bandit -r . || true   # ignore errors for now
+          bandit -r .   # fails workflow if security issues found
 
       # 6️⃣ Trivy File System Scan
       - name: Trivy FS Scan
@@ -46,27 +48,27 @@ jobs:
           scan-type: 'fs'
           format: 'table'
           ignore-unfixed: true
-          exit-code: '0'
+          exit-code: '1'   # fail if vulnerabilities found
 
       # 7️⃣ Unit Tests + Coverage
       - name: Run Unit Tests with Coverage
         run: |
           pip install pytest pytest-cov
-          pytest --cov=shailuns --cov-fail-under=80 || true
+          pytest --cov=shailuns --cov-fail-under=80
 
       # 8️⃣ Build Docker Image
       - name: Build Docker Image
         run: |
           docker build -t shailun-app:latest .
 
-      # 9️⃣ Docker Image Scan
+      # 9️⃣ Trivy Docker Image Scan
       - name: Trivy Docker Image Scan
         run: |
-          trivy image --exit-code 0 --severity CRITICAL,HIGH shailun-app:latest
+          trivy image --exit-code 1 --severity CRITICAL,HIGH shailun-app:latest
 
       # 🔟 Push Docker Image to Docker Hub
       - name: Push Docker Image
-        if: success()
+        if: success()   # only runs if all previous steps succeed
         run: |
           echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
           docker tag shailun-app:latest ${{ secrets.DOCKER_USER }}/shailun-app:latest
